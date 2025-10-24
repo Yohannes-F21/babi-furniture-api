@@ -1,5 +1,8 @@
 const Product = require("../models/product-model");
+
 const addNewProduct = async (req, res) => {
+  const { username, userId, role } = req.userInfo;
+
   try {
     const newProductFormData = req.body;
     const newlyCreatedProduct = await Product.create(newProductFormData);
@@ -8,6 +11,11 @@ const addNewProduct = async (req, res) => {
         success: true,
         message: "Product added successfully",
         data: newlyCreatedProduct,
+        user: {
+          _id: userId,
+          username,
+          role,
+        },
       });
     }
   } catch (e) {
