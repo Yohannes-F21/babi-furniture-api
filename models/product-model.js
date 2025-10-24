@@ -15,6 +15,10 @@ const productSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    thumbnail: {
+      type: String,
+      default: "https://via.placeholder.com/150",
+    },
     category: {
       enum: [
         "sofa",
