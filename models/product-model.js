@@ -17,7 +17,11 @@ const productSchema = new mongoose.Schema(
     },
     thumbnail: {
       type: String,
-      default: "https://via.placeholder.com/150",
+      required: true,
+    },
+    images: {
+      type: [String], // Array of image URLs
+      default: [],
     },
     category: {
       enum: [

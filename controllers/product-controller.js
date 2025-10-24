@@ -3,36 +3,49 @@ const upload = require("../middleware/multer-config");
 
 const addNewProduct = async (req, res) => {
   const { username, userId, role } = req.userInfo;
-  upload.single("thumbnail")(req, res, async (err) => {
+
+  upload.fields([
+    { name: "thumbnail", maxCount: 1 },
+    { name: "images", maxCount: 4 },
+  ])(req, res, async (err) => {
     if (err) {
       return res.status(400).json({
         success: false,
-        message: "Error uploading thumbnail",
+        message: "Error uploading files",
         error: err,
       });
     }
 
     try {
-      const thumbnail = req.file
-        ? req.file.path || req.file.url
-        : "https://placehold.co/600x400?text=Cover+Image";
-      console.log("Thumbnail URL:", thumbnail);
-      const newProductFormData = { ...req.body, thumbnail };
+      const thumbnail =
+        req.files?.thumbnail?.[0]?.path ||
+        req.files?.thumbnail?.[0]?.url ||
+        "https://placehold.co/600x400?text=Cover+Image";
+
+      const images = req.files?.images
+        ? req.files.images.map((file) => file.path || file.url)
+        : [];
+
+      const newProductFormData = {
+        ...req.body,
+        thumbnail,
+        images,
+      };
+
       const newlyCreatedProduct = await Product.create(newProductFormData);
-      if (newProductFormData) {
-        res.status(201).json({
-          success: true,
-          message: "Product added successfully",
-          data: newlyCreatedProduct,
-          user: {
-            _id: userId,
-            username,
-            role,
-          },
-        });
-      }
-    } catch (e) {
-      console.log(e);
+
+      res.status(201).json({
+        success: true,
+        message: "Product added successfully",
+        data: newlyCreatedProduct,
+        user: {
+          _id: userId,
+          username,
+          role,
+        },
+      });
+    } catch (error) {
+      console.error(error);
       res.status(500).json({
         success: false,
         message: "Something went wrong! Please try again",
