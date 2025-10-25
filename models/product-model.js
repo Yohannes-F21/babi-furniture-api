@@ -15,11 +15,19 @@ const productSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-    thumbnail: {
+    thumbnailUrl: {
       type: String,
       required: true,
     },
-    images: {
+    imagesUrl: {
+      type: [String], // Array of image URLs
+      default: [],
+    },
+    thumbnailPublicId: {
+      type: String,
+      required: true,
+    },
+    imagePublicIds: {
       type: [String], // Array of image URLs
       default: [],
     },

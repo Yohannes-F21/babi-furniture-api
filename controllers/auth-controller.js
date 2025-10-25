@@ -6,17 +6,17 @@ const jwt = require("jsonwebtoken");
 const registerUser = async (req, res) => {
   try {
     //extract user information from our request body
-    const { username, email, password, role } = req.body;
+    const { userName, email, password, role } = req.body;
 
     //check if the user is already exists in our database
     const checkExistingUser = await userModel.findOne({
-      $or: [{ username }, { email }],
+      $or: [{ userName }, { email }],
     });
     if (checkExistingUser) {
       return res.status(400).json({
         success: false,
         message:
-          "User is already exists either with same username or same email. Please try with a different username or email",
+          "User is already exists either with same userName or same email. Please try with a different userName or email",
       });
     }
 
@@ -26,7 +26,7 @@ const registerUser = async (req, res) => {
 
     //create a new user and save in your database
     const newlyCreatedUser = new userModel({
-      username,
+      userName,
       email,
       password: hashedPassword,
       role: role || "user",
@@ -57,10 +57,10 @@ const registerUser = async (req, res) => {
 
 const loginUser = async (req, res) => {
   try {
-    const { username, password } = req.body;
+    const { userName, password } = req.body;
 
     //find if the current user is exists in database or not
-    const user = await userModel.findOne({ username });
+    const user = await userModel.findOne({ userName });
 
     if (!user) {
       return res.status(400).json({
@@ -82,7 +82,7 @@ const loginUser = async (req, res) => {
     const accessToken = jwt.sign(
       {
         userId: user._id,
-        username: user.username,
+        userName: user.userName,
         role: user.role,
       },
       process.env.JWT_SECRET_KEY,
@@ -105,7 +105,57 @@ const loginUser = async (req, res) => {
     });
   }
 };
+
+const changePassword = async (req, res) => {
+  try {
+    const userId = req.userInfo.userId;
+
+    //extract old and new password;
+    const { oldPassword, newPassword } = req.body;
+
+    //find the current logged in user
+    const user = await userModel.findById(userId);
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    //check if the old password is correct
+    const isPasswordMatch = await bcrypt.compare(oldPassword, user.password);
+
+    if (!isPasswordMatch) {
+      return res.status(400).json({
+        success: false,
+        message: "Old password is not correct! Please try again.",
+      });
+    }
+
+    //hash the new password here
+    const salt = await bcrypt.genSalt(10);
+    const newHashedPassword = await bcrypt.hash(newPassword, salt);
+
+    //update user password
+    user.password = newHashedPassword;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Password changed successfully",
+    });
+  } catch (e) {
+    console.log(e);
+    res.status(500).json({
+      success: false,
+      message: "Some error occurred! Please try again",
+    });
+  }
+};
+
 module.exports = {
   registerUser,
   loginUser,
+  changePassword,
 };
