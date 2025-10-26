@@ -41,6 +41,7 @@ const addNewProduct = async (req, res) => {
         imagesUrl,
         thumbnailPublicId,
         imagePublicIds,
+        createdBy: userId,
       };
 
       const newlyCreatedProduct = await Product.create(newProductFormData);
@@ -69,16 +70,16 @@ const getAllProducts = async (req, res) => {
     /*
       const page = parseInt(req.query.page) || 1; // Default to page 1
     const limit = parseInt(req.query.limit) || 8; // Default to 8 products per page
-    const skip = (page - 1) * limit; // Calculate the number of documents to skip
+    const skip = (page - 1) * limit; // Calculate the number of documents to skip when paginating
 
     const sortBy = req.query.sortBy || "createdAt";
     const sortOrder = req.query.sortOrder === "asc" ? 1 : -1;
-    const totalProducts = await Image.countDocuments();
+    const totalProducts = await Product.countDocuments();
     const totalPages = Math.ceil(totalProducts / limit);
 
     const sortObj = {};
     sortObj[sortBy] = sortOrder;
-    const allProducts = await Image.find()
+    const allProducts = await Product.find()
       .sort(sortObj)
       .skip(skip)
       .limit(limit);
@@ -99,7 +100,10 @@ const getAllProducts = async (req, res) => {
       });
     } // for future pagination purpose
     */
-    const allProducts = await Product.find({});
+    const allProducts = await Product.find({}).populate(
+      "createdBy",
+      "userName email"
+    ); // populate createdBy field with userName and email from User model
     if (allProducts?.length > 0) {
       res.status(200).json({
         success: true,
