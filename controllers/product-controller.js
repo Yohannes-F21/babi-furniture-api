@@ -67,63 +67,69 @@ const addNewProduct = async (req, res) => {
 };
 const getAllProducts = async (req, res) => {
   try {
-    /*
-      const page = parseInt(req.query.page) || 1; // Default to page 1
-    const limit = parseInt(req.query.limit) || 8; // Default to 8 products per page
-    const skip = (page - 1) * limit; // Calculate the number of documents to skip when paginating
+    const { category } = req.body;
 
-    const sortBy = req.query.sortBy || "createdAt";
-    const sortOrder = req.query.sortOrder === "asc" ? 1 : -1;
-    const totalProducts = await Product.countDocuments();
-    const totalPages = Math.ceil(totalProducts / limit);
+    // Match stage (filters by category if provided)
+    const matchStage =
+      category && category.trim() !== "" ? { category: category.trim() } : {};
 
-    const sortObj = {};
-    sortObj[sortBy] = sortOrder;
-    const allProducts = await Product.find()
-      .sort(sortObj)
-      .skip(skip)
-      .limit(limit);
-    // const allProducts = await Product.find({});
-    if (allProducts?.length > 0) {
+    // Aggregation pipeline
+    const allProducts = await Product.aggregate([
+      {
+        $match: matchStage,
+      },
+      {
+        $sort: { createdAt: -1 },
+      },
+      {
+        // Lookup user info from the users collection
+        $lookup: {
+          from: "users", // name of your User collection in MongoDB
+          localField: "createdBy", // field in Product schema
+          foreignField: "_id", // field in User schema
+          as: "createdBy", // replace with populated user info
+        },
+      },
+      {
+        // Only take name and email from the joined user array
+        $addFields: {
+          createdBy: {
+            $cond: {
+              if: { $gt: [{ $size: "$createdBy" }, 0] },
+              then: {
+                // _id: { $arrayElemAt: ["$createdBy._id", 0] },
+                name: { $arrayElemAt: ["$createdBy.userName", 0] },
+                email: { $arrayElemAt: ["$createdBy.email", 0] },
+              },
+              else: null,
+            },
+          },
+        },
+      },
+    ]);
+
+    if (allProducts.length > 0) {
       res.status(200).json({
         success: true,
-        message: "List of products fetched successfully",
-        currentPage: page,
-        totalPages: totalPages,
-        totalProducts: totalProducts,
+        message: "Products fetched successfully",
+        total: allProducts.length,
         data: allProducts,
       });
     } else {
       res.status(404).json({
         success: false,
-        message: "Bo products found in collection",
-      });
-    } // for future pagination purpose
-    */
-    const allProducts = await Product.find({}).populate(
-      "createdBy",
-      "userName email"
-    ); // populate createdBy field with userName and email from User model
-    if (allProducts?.length > 0) {
-      res.status(200).json({
-        success: true,
-        message: "List of products fetched successfully",
-        data: allProducts,
-      });
-    } else {
-      res.status(404).json({
-        success: false,
-        message: "Bo products found in collection",
+        message: "No products found",
       });
     }
-  } catch (e) {
-    console.log(e);
+  } catch (error) {
+    console.error("Error fetching products:", error);
     res.status(500).json({
       success: false,
-      message: "Something went wrong! Please try again",
+      message: "Something went wrong! Please try again.",
     });
   }
 };
+
 const getSingleProductById = async (req, res) => {
   try {
     const currentProduct = await Product.findById(req.params.id);
