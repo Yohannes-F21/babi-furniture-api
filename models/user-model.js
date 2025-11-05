@@ -24,6 +24,9 @@ const UserSchema = new mongoose.Schema(
       enum: ["user", "admin"], // only allow 'user' or 'admin' roles
       default: "user",
     },
+    refreshToken: {
+      type: String,
+    },
   },
   { timestamps: true }
 );
