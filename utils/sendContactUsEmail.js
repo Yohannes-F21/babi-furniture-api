@@ -11,7 +11,7 @@ const sendContactUsMail = async ({ name, email, message, subject }) => {
 
   const mailOptions = {
     from: `${name} <${email}>`,
-    to: "yohannesfantahun88@gmail.com",
+    to: "hailegebralefantahun@gmail.com",
     subject,
     text: `You received a new message from ${name} (${email}):\n\n${message}`,
   };
