@@ -59,13 +59,14 @@ const registerUser = async (req, res) => {
 // LOGIN CONTROLLER
 const loginUser = async (req, res) => {
   try {
-    const { userName, password } = req.body;
-    const user = await userModel.findOne({ userName });
+    const { email, password } = req.body;
+    console.log(email, password);
+    const user = await userModel.findOne({ email });
 
     if (!user) {
       return res
         .status(400)
-        .json({ success: false, message: "User not found" });
+        .json({ success: false, message: "User Not Found" });
     }
 
     const isPasswordMatch = await bcrypt.compare(password, user.password);
@@ -87,7 +88,7 @@ const loginUser = async (req, res) => {
       secure: process.env.NODE_ENV === "production", // only HTTPS in production
       sameSite: "strict",
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-      path: "/api/auth/refresh-token",
+      path: "/",
     });
 
     res.status(200).json({
@@ -166,6 +167,13 @@ const refreshAccessToken = async (req, res) => {
     return res.status(200).json({
       success: true,
       accessToken,
+      message: "Access token refreshed successfully",
+      user: {
+        id: user._id,
+        userName: user.userName,
+        email: user.email,
+        role: user.role,
+      },
     });
   } catch (error) {
     console.error("Refresh token error:", error);
@@ -177,21 +185,33 @@ const refreshAccessToken = async (req, res) => {
 const logoutUser = async (req, res) => {
   try {
     const { refreshToken } = req.cookies;
-    if (!refreshToken)
+
+    if (!refreshToken) {
       return res
         .status(400)
         .json({ success: false, message: "No token found" });
-
-    const user = await userModel.findOne({ refreshToken });
-    if (user) {
-      user.refreshToken = null;
-      await user.save();
     }
 
-    res.clearCookie("refreshToken");
-    res.status(200).json({ success: true, message: "Logged out successfully" });
-  } catch (e) {
-    res.status(500).json({ success: false, message: "Logout failed" });
+    // Clear from DB
+    await userModel.updateOne(
+      { refreshToken },
+      { $set: { refreshToken: null } }
+    );
+
+    // Clear cookie — MATCH EXACTLY
+    res.clearCookie("refreshToken", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+    });
+
+    return res
+      .status(200)
+      .json({ success: true, message: "Logged out successfully" });
+  } catch (error) {
+    console.error("Logout error:", error);
+    return res.status(500).json({ success: false, message: "Logout failed" });
   }
 };
 
