@@ -60,7 +60,7 @@ const registerUser = async (req, res) => {
 const loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
-    console.log(email, password);
+
     const user = await userModel.findOne({ email });
 
     if (!user) {
@@ -86,7 +86,7 @@ const loginUser = async (req, res) => {
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production", // only HTTPS in production
-      sameSite: "strict",
+      sameSite: "lax",
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
       path: "/",
     });
@@ -109,51 +109,56 @@ const loginUser = async (req, res) => {
 };
 
 // REFRESH TOKEN ENDPOINT
+// REFRESH TOKEN CONTROLLER (REWRITTEN)
 const refreshAccessToken = async (req, res) => {
   try {
     const refreshToken = req.cookies.refreshToken;
-    console.log("Cookies received:", req.cookies);
 
-    // 1. Check cookie exists
+    // 1. No cookie found
     if (!refreshToken) {
-      return res
-        .status(401)
-        .json({ success: false, message: "No refresh token provided" });
+      return res.status(401).json({
+        success: false,
+        message: "Refresh token missing",
+      });
     }
 
-    // 2. Find user with this refresh token
+    // 2. Find the user that owns this token
     const user = await userModel.findOne({ refreshToken });
     if (!user) {
-      return res
-        .status(403)
-        .json({ success: false, message: "Invalid refresh token" });
+      return res.status(403).json({
+        success: false,
+        message: "Refresh token invalid",
+      });
     }
 
-    // 3. Verify JWT (use promisified version)
-    let decoded;
+    // 3. Verify JWT validity
+    let decodedData;
     try {
-      decoded = await jwt.verify(
+      decodedData = jwt.verify(
         refreshToken,
         process.env.JWT_REFRESH_SECRET_KEY
       );
     } catch (err) {
-      // Remove invalid token from DB
+      // Remove corrupted token
       user.refreshToken = null;
       await user.save();
-      return res
-        .status(403)
-        .json({ success: false, message: "Invalid or expired refresh token" });
+
+      return res.status(403).json({
+        success: false,
+        message: "Refresh token expired or invalid",
+      });
     }
 
-    // 4. CRITICAL: Match userId from token with DB user
-    if (decoded.userId !== user._id.toString()) {
-      return res
-        .status(403)
-        .json({ success: false, message: "Token mismatch" });
+    // 4. Ensure the token belongs to this user
+    if (decodedData.userId !== user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: "Token does not match user",
+      });
     }
 
     // 5. Generate new access token
-    const accessToken = jwt.sign(
+    const newAccessToken = jwt.sign(
       {
         userId: user._id,
         userName: user.userName,
@@ -163,10 +168,10 @@ const refreshAccessToken = async (req, res) => {
       { expiresIn: "15m" }
     );
 
-    // 6. Success
+    // 6. Respond with new access token
     return res.status(200).json({
       success: true,
-      accessToken,
+      accessToken: newAccessToken,
       message: "Access token refreshed successfully",
       user: {
         id: user._id,
@@ -176,8 +181,11 @@ const refreshAccessToken = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Refresh token error:", error);
-    return res.status(500).json({ success: false, message: "Server error" });
+    console.error("Refresh Access Token Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
   }
 };
 
