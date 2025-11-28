@@ -158,7 +158,7 @@ const getAllProducts = async (req, res) => {
             $cond: {
               if: { $gt: [{ $size: "$createdBy" }, 0] },
               then: {
-                name: { $arrayElemAt: ["$createdBy.userName", 0] },
+                userName: { $arrayElemAt: ["$createdBy.userName", 0] },
                 email: { $arrayElemAt: ["$createdBy.email", 0] },
               },
               else: null,
