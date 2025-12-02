@@ -8,7 +8,7 @@ const productSchema = new mongoose.Schema(
       required: true,
     },
     price: {
-      type: Decimal,
+      type: String,
       required: true,
     },
     description: {
@@ -42,6 +42,10 @@ const productSchema = new mongoose.Schema(
       ],
       required: true,
       type: String,
+    },
+    isFeatured: {
+      type: Boolean,
+      default: false,
     },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,

@@ -209,34 +209,121 @@ const getSingleProductById = async (req, res) => {
 };
 
 const updateProduct = async (req, res) => {
-  try {
-    const updatedProductFormData = req.body;
-    const getCurrentProductID = req.params.id;
-    const updatedProduct = await Product.findByIdAndUpdate(
-      getCurrentProductID,
-      updatedProductFormData,
-      {
-        new: true,
-      }
-    );
+  const { id } = req.params;
 
-    if (!updatedProduct) {
-      res.status(404).json({
+  try {
+    // FIRST: Check if product exists — BEFORE ANY UPLOAD!
+    const currentProduct = await Product.findById(id);
+    if (!currentProduct) {
+      return res.status(404).json({
         success: false,
-        message: "Product is not found with this ID",
+        message: "Product not found",
       });
     }
 
-    res.status(200).json({
-      success: true,
-      message: "Product updated successfully",
-      data: updatedProduct,
+    // ONLY RUN UPLOAD IF THERE ARE FILES
+    const hasFiles = req.headers["content-type"]?.includes(
+      "multipart/form-data"
+    );
+
+    if (!hasFiles) {
+      // No files → just update text fields
+      const updated = await Product.findByIdAndUpdate(
+        id,
+        {
+          title: req.body.title || currentProduct.title,
+          category: (
+            req.body.category || currentProduct.category
+          ).toLowerCase(),
+          description: req.body.description || currentProduct.description,
+          price: req.body.price || currentProduct.price,
+          isFeatured:
+            req.body.isFeatured === "true" || req.body.isFeatured === true,
+        },
+        { new: true }
+      );
+
+      return res.status(200).json({
+        success: true,
+        message: "Product updated (no images changed)",
+        data: updated,
+      });
+    }
+
+    // ONLY IF FILES EXIST → RUN UPLOAD
+    upload.fields([
+      { name: "thumbnail", maxCount: 1 },
+      { name: "images", maxCount: 4 },
+    ])(req, res, async (err) => {
+      if (err) {
+        return res.status(400).json({
+          success: false,
+          message: "File upload error",
+          error: err.message,
+        });
+      }
+
+      try {
+        let updateData = {
+          title: req.body.title || currentProduct.title,
+          category: (
+            req.body.category || currentProduct.category
+          ).toLowerCase(),
+          description: req.body.description || currentProduct.description,
+          price: req.body.price || currentProduct.price,
+          isFeatured:
+            req.body.isFeatured === "true" || req.body.isFeatured === true,
+        };
+
+        // ONLY UPLOAD & DELETE IF THUMBNAIL CHANGED
+        if (req.files?.thumbnail?.[0]) {
+          // Delete old
+          if (currentProduct.thumbnailPublicId) {
+            await cloudinary.uploader.destroy(currentProduct.thumbnailPublicId);
+          }
+          // Upload new
+          updateData.thumbnailUrl =
+            req.files.thumbnail[0].path || req.files.thumbnail[0].url;
+          updateData.thumbnailPublicId = req.files.thumbnail[0].filename;
+        }
+
+        // ONLY UPLOAD & DELETE IF IMAGES CHANGED
+        if (req.files?.images && req.files.images.length > 0) {
+          // Delete old images
+          if (currentProduct.imagePublicIds?.length > 0) {
+            await Promise.all(
+              currentProduct.imagePublicIds.map((id) =>
+                cloudinary.uploader.destroy(id)
+              )
+            );
+          }
+          // Upload new
+          updateData.imagesUrl = req.files.images.map((f) => f.path || f.url);
+          updateData.imagePublicIds = req.files.images.map((f) => f.filename);
+        }
+
+        // Final update
+        const updatedProduct = await Product.findByIdAndUpdate(id, updateData, {
+          new: true,
+        });
+
+        res.status(200).json({
+          success: true,
+          message: "Product updated successfully",
+          data: updatedProduct,
+        });
+      } catch (error) {
+        console.error(error);
+        res.status(500).json({
+          success: false,
+          message: "Update failed",
+        });
+      }
     });
-  } catch (e) {
-    console.log(e);
+  } catch (error) {
     res.status(500).json({
       success: false,
-      message: "Something went wrong! Please try again",
+      message: "Server error",
     });
   }
 };

@@ -14,6 +14,7 @@ const authMiddleware = async (req, res, next) => {
     try {
       return jwt.verify(token, process.env.JWT_SECRET_KEY);
     } catch (err) {
+      console.log("Access token verification error:", err);
       return null;
     }
   };
